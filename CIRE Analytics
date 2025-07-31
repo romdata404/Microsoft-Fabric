@@ -1,0 +1,62 @@
+//CIRE - Dataflow// *Dataflow Gen2, refresh first
+
+//Historical_7_30_2025
+let
+  Source = SharePoint.Files("https://hokkaidotracks.sharepoint.com/sites/digitaldevelopment/", [ApiVersion = 15]),
+  #"Filtered rows" = Table.SelectRows(Source, each ([Folder Path] = "https://hokkaidotracks.sharepoint.com/sites/digitaldevelopment/Shared Documents/Dashboard/CIRE Deals/")),
+  Navigation = #"Filtered rows"{[Name = "Deals.csv", #"Folder Path" = "https://hokkaidotracks.sharepoint.com/sites/digitaldevelopment/Shared Documents/Dashboard/CIRE Deals/"]}[Content],
+  #"Imported CSV" = Csv.Document(Navigation, [Delimiter = ",", Columns = 115, Encoding = 65001, QuoteStyle = QuoteStyle.Csv]),
+  #"Promoted headers" = Table.PromoteHeaders(#"Imported CSV", [PromoteAllScalars = true])
+in
+  #"Promoted headers"
+
+//FreshSales_DEALS_API
+let
+  url = "https://h2groupcrm.myfreshworks.com/crm/sales/api/analytic_reports/schedule/?id=397e8a10-f7fd-40af-9a72-33ede1473bcb",
+  token = "Token token=rUvxpezkf8x4i5Uc6lc3rw",
+  Source = Csv.Document(
+    Web.Contents(
+      url,
+      [ Headers = [ Authorization = token ] ]
+    )
+  ),
+    #"Promoted Headers" = Table.PromoteHeaders(Source, [PromoteAllScalars=true]),
+  #"Renamed columns" = Table.RenameColumns(#"Promoted Headers", {{"ID", "Id"}})
+in
+    #"Renamed columns"
+
+//MasterColumns
+let
+    // Superset of all column names across both tables
+    MasterColumns =
+        List.Union({
+            Table.ColumnNames(Historical_7_30_2025),
+            Table.ColumnNames(FreshSales_DEALS_API)
+        }),
+  #"Removed duplicates" = List.Distinct(MasterColumns)
+in
+    #"Removed duplicates"
+
+//DEALS_API_Align
+let
+  Source = FreshSales_DEALS_API,
+  #"Align to Superset" =
+    Table.SelectColumns(
+        Source,  
+        MasterColumns,
+        MissingField.UseNull)
+
+in
+  #"Align to Superset"
+
+//Hist_Align
+let
+  Source = Historical_7_30_2025,
+  #"Align to Superset" =
+    Table.SelectColumns(
+        Source,  
+        MasterColumns,
+        MissingField.UseNull)
+
+in
+  #"Align to Superset"
