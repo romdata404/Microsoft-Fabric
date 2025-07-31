@@ -1,4 +1,4 @@
-//CIRE - Dataflow// *Dataflow Gen2, refresh first
+//CIRE - Dataflow// *Dataflow Gen2, refresh first 
 
 //Historical_7_30_2025
 let
@@ -37,7 +37,7 @@ let
 in
     #"Removed duplicates"
 
-//DEALS_API_Align
+//DEALS_API_Align *Append to Lakehouse table
 let
   Source = FreshSales_DEALS_API,
   #"Align to Superset" =
@@ -49,7 +49,7 @@ let
 in
   #"Align to Superset"
 
-//Hist_Align
+//Hist_Align *Lakehouse, replace w/ dynamic
 let
   Source = Historical_7_30_2025,
   #"Align to Superset" =
@@ -60,3 +60,30 @@ let
 
 in
   #"Align to Superset"
+
+
+
+//CIRE - Final Step// *save in Lakehouse after CIRE - Dataflow refresh
+
+//API_Align
+let
+  Source = Lakehouse.Contents([]),
+  #"Navigation 1" = Source{[workspaceId = "89081d4b-591f-4d3c-9841-2a697ab187f4"]}[Data],
+  #"Navigation 2" = #"Navigation 1"{[lakehouseId = "572c2603-fbfa-4ba1-85af-70d556fa7e9d"]}[Data],
+  Navigation = #"Navigation 2"{[Id = "DEALS_API_Align", ItemKind = "Table"]}[Data],
+  #"Sorted rows" = Table.Sort(Navigation, {{"Updated at", Order.Ascending}}),
+  #"Removed duplicates" = Table.Distinct(#"Sorted rows", {"Id"})
+in
+  #"Removed duplicates"
+
+//Hist_Align *Lakehouse: replace w/ dynamic
+let
+  Source = Lakehouse.Contents([]),
+  #"Navigation 1" = Source{[workspaceId = "89081d4b-591f-4d3c-9841-2a697ab187f4"]}[Data],
+  #"Navigation 2" = #"Navigation 1"{[lakehouseId = "572c2603-fbfa-4ba1-85af-70d556fa7e9d"]}[Data],
+  #"Navigation 3" = #"Navigation 2"{[Id = "Hist_Align", ItemKind = "Table"]}[Data],
+  #"Appended query" = Table.Combine({#"Navigation 3", API_Align}),
+  #"Sorted rows" = Table.Sort(#"Appended query", {{"Updated at", Order.Ascending}}),
+  #"Removed duplicates" = Table.Distinct(#"Sorted rows", {"Id"})
+in
+  #"Removed duplicates"
